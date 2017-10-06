@@ -25,8 +25,8 @@ fn main() {
     let vbox = gtk::Box::new(Vertical, 0);
     gtk_window.add(&vbox);
 
-    let mut webview = WebView::new();
-    vbox.add(webview.view());
+    let webview = WebView::new();
+    vbox.add(&webview.view());
 
     gtk_window.connect_delete_event(|_, _| {
         gtk::main_quit();
@@ -34,13 +34,12 @@ fn main() {
     });
 
     gtk_window.show_all();
-    let controller = webview.show(); // TODO: try to improve so that we don't need this.
 
     {
-        let controller = controller.clone();
+        let webview = webview.clone();
         gtk_window.connect_key_press_event(move |_, event| {
             if event.get_keyval() == key::R {
-                controller.reload();
+                webview.reload();
             }
             Inhibit(false)
         });

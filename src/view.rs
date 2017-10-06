@@ -19,6 +19,7 @@ use gtk::{
     WidgetExt,
 };
 use servo;
+use servo::BrowserId;
 use servo::compositing::windowing::{WindowEvent, WindowMethods};
 use servo::euclid::{TypedPoint2D, TypedVector2D};
 use servo::gl;
@@ -28,9 +29,20 @@ use servo::servo_config::resource_files::set_resources_path;
 use servo::servo_url::ServoUrl;
 use shared_library::dynamic_library::DynamicLibrary;
 
-use controller::WebViewController;
 use eventloop::GtkEventLoopWaker;
 use window::GtkWindow;
+
+macro_rules! with_servo {
+    ($_self:ident, | $browser_id:ident, $servo:ident | $block:block) => {
+        let mut state = $_self.state.borrow_mut();
+        if let Some($browser_id) = state.browser_id.clone() {
+            if let Some(ref mut servo) = state.servo {
+                let mut $servo = servo.borrow_mut();
+                $block
+            }
+        }
+    };
+}
 
 pub type View = GLArea;
 
@@ -48,11 +60,18 @@ impl Pos {
     }
 }
 
-pub struct WebView {
-    pointer: Rc<RefCell<Pos>>,
+struct State {
+    browser_id: Option<BrowserId>,
+    pointer: Pos,
     rx: Receiver,
+    servo: Option<Rc<RefCell<servo::Servo<GtkWindow>>>>,
     view: View,
     window: Rc<GtkWindow>,
+}
+
+#[derive(Clone)]
+pub struct WebView {
+    state: Rc<RefCell<State>>,
 }
 
 impl WebView {
@@ -62,8 +81,6 @@ impl WebView {
         view.set_has_depth_buffer(true);
         view.add_events((POINTER_MOTION_MASK | SCROLL_MASK).bits() as i32);
         view.set_vexpand(true); // TODO: put somewhere else?
-
-        let pointer = Rc::new(RefCell::new(Pos::new(0.0, 0.0)));
 
         epoxy::load_with(|s| {
             unsafe {
@@ -83,33 +100,46 @@ impl WebView {
 
         let window = Rc::new(GtkWindow::new(gl, view.clone(), waker));
 
-        WebView {
-            pointer,
+        let state = Rc::new(RefCell::new(State {
+            browser_id: None,
+            pointer: Pos::new(0.0, 0.0),
             rx,
-            view,
+            servo: None,
+            view: view.clone(),
             window,
+        }));
+
+        {
+            let state = state.clone();
+            view.connect_realize(move |_| {
+                Self::prepare(state.clone());
+            });
+        }
+
+        WebView {
+            state,
         }
     }
 
-    pub fn show(&mut self) -> WebViewController {
-        self.view.make_current();
+    fn prepare(state: Rc<RefCell<State>>) {
+        state.borrow().view.make_current();
 
-        let servo = Rc::new(RefCell::new(servo::Servo::new(self.window.clone())));
+        let servo = Rc::new(RefCell::new(servo::Servo::new(state.borrow().window.clone())));
 
         {
             let servo = servo.clone();
-            self.rx.connect_recv(move || {
+            state.borrow_mut().rx.connect_recv(move || {
                 servo.borrow_mut().handle_events(vec![]);
                 Continue(true)
             });
         }
 
         {
-            let pointer = self.pointer.clone();
+            let inner_state = state.clone();
             let servo = servo.clone();
-            self.view.connect_motion_notify_event(move |_, event| {
+            state.borrow().view.connect_motion_notify_event(move |_, event| {
                 let (x, y) = event.get_position();
-                let mut pointer = pointer.borrow_mut();
+                let pointer = &mut inner_state.borrow_mut().pointer;
                 pointer.x = x;
                 pointer.y = y;
                 let event = WindowEvent::MouseWindowMoveEventClass(TypedPoint2D::new(x as f32, y as f32));
@@ -119,18 +149,18 @@ impl WebView {
         }
 
         {
+            let inner_state = state.clone();
             let servo = servo.clone();
-            let window = self.window.clone();
-            self.view.connect_resize(move |_, _, _| {
-                let event = WindowEvent::Resize(window.framebuffer_size());
+            state.borrow().view.connect_resize(move |_, _, _| {
+                let event = WindowEvent::Resize(inner_state.borrow().window.framebuffer_size());
                 servo.borrow_mut().handle_events(vec![event]);
             });
         }
 
         {
-            let pointer = self.pointer.clone();
+            let inner_state = state.clone();
             let servo = servo.clone();
-            self.view.connect_scroll_event(move |_, event| {
+            state.borrow().view.connect_scroll_event(move |_, event| {
                 let phase = match event.get_direction() {
                     ScrollDirection::Down => TouchEventType::Down,
                     ScrollDirection::Up => TouchEventType::Up,
@@ -147,7 +177,7 @@ impl WebView {
                     };
                 let dy = dy * 38.0;
                 let pointer = {
-                    let pointer = pointer.borrow();
+                    let pointer = &inner_state.borrow().pointer;
                     TypedPoint2D::new(pointer.x as i32, pointer.y as i32)
                 };
                 let scroll_location = servo::webrender_api::ScrollLocation::Delta(TypedVector2D::new(dx as f32, dy as f32));
@@ -166,11 +196,18 @@ impl WebView {
         servo.borrow_mut().handle_events(vec![WindowEvent::NewBrowser(url, sender)]);
         let browser_id = receiver.recv().unwrap();
         servo.borrow_mut().handle_events(vec![WindowEvent::SelectBrowser(browser_id)]);
-
-        WebViewController::new(servo, browser_id)
+        state.borrow_mut().browser_id = Some(browser_id);
+        state.borrow_mut().servo = Some(servo);
     }
 
-    pub fn view(&self) -> &View {
-        &self.view
+    pub fn reload(&self) {
+        with_servo!(self, |browser_id, servo| {
+            let event = WindowEvent::Reload(browser_id);
+            servo.handle_events(vec![event]);
+        });
+    }
+
+    pub fn view(&self) -> View {
+        self.state.borrow().view.clone()
     }
 }

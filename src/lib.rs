@@ -5,7 +5,6 @@ extern crate gtk;
 extern crate servo;
 extern crate shared_library;
 
-pub mod controller;
 mod eventloop;
 pub mod view;
 mod window;
