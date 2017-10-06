@@ -1,0 +1,18 @@
+[package]
+authors = ["Antoni Boucher <antoni.boucher@adgear.com>"]
+name = "servo-gtk"
+version = "0.1.0"
+[dependencies]
+epoxy = "^0.0.3"
+gdk = "^0.6.0"
+glib = "^0.3.1"
+glib-itc = "^0.2.1"
+gtk = "^0.2.0"
+shared_library = "^0.1.7"
+
+[dependencies.libservo]
+git = "https://github.com/servo/servo"
+rev = "6051e5ed02"
+
+[features]
+default = ["gtk/v3_16"]

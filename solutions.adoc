@@ -1,0 +1,11 @@
+= Issues and their solution
+
+== Device reporting insufficient max texture size (0)
+
+=== Panic
+
+thread 'main' panicked at 'Unable to initialize webrender!: MaxTextureSize', /checkout/src/libcore/result.rs:906:4
+
+=== Solution
+
+Need to create Servo after the window is shown.
