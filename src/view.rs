@@ -80,7 +80,7 @@ impl WebView {
         view.set_auto_render(false);
         view.set_has_depth_buffer(true);
         view.add_events((POINTER_MOTION_MASK | SCROLL_MASK).bits() as i32);
-        view.set_vexpand(true); // TODO: put somewhere else?
+        view.set_size_request(200, 200);
 
         epoxy::load_with(|s| {
             unsafe {

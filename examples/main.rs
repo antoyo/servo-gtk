@@ -26,7 +26,9 @@ fn main() {
     gtk_window.add(&vbox);
 
     let webview = WebView::new();
-    vbox.add(&webview.view());
+    let view = webview.view();
+    view.set_vexpand(true);
+    vbox.add(&view);
 
     gtk_window.connect_delete_event(|_, _| {
         gtk::main_quit();
