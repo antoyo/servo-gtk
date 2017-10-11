@@ -19,6 +19,13 @@ use servo::style_traits::DevicePixel;
 
 use view::View;
 
+struct Allocation {
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+}
+
 pub struct GtkWindow {
     gl: Rc<gl::Gl>,
     view: View,
@@ -31,6 +38,29 @@ impl GtkWindow {
             gl,
             view,
             waker,
+        }
+    }
+
+    fn get_geometry(&self) -> Allocation {
+        let allocation = self.view.get_allocation();
+        let (mut width, mut height) = (allocation.width as u32, allocation.height as u32);
+
+        #[cfg(target_os = "windows")]
+        let factor = super::utils::windows_hidpi_factor();
+        #[cfg(not(target_os = "windows"))]
+        let factor = 1.0f32;
+
+        width /= factor as u32;
+        height /= factor as u32;
+
+        let x = allocation.x as u32;
+        let y = allocation.y as u32;
+
+        Allocation {
+            x,
+            y,
+            width,
+            height,
         }
     }
 }
@@ -62,11 +92,9 @@ impl WindowMethods for GtkWindow {
     }
 
     fn framebuffer_size(&self) -> TypedSize2D<u32, DevicePixel> {
-        let window = self.view.get_window().unwrap();
-        let width = window.get_width();
-        let height = window.get_height();
+        let geometry = self.get_geometry();
         let scale_factor = self.view.get_scale_factor() as u32;
-        TypedSize2D::new(scale_factor * width as u32, scale_factor * height as u32)
+        TypedSize2D::new(scale_factor * geometry.width as u32, scale_factor * geometry.height as u32)
     }
 
     fn window_rect(&self) -> TypedRect<u32, DevicePixel> {
@@ -74,18 +102,15 @@ impl WindowMethods for GtkWindow {
     }
 
     fn size(&self) -> TypedSize2D<f32, DeviceIndependentPixel> {
-        let window = self.view.get_window().unwrap();
-        let width = window.get_width();
-        let height = window.get_height();
-        TypedSize2D::new(width as f32, height as f32)
+        let geometry = self.get_geometry();
+        TypedSize2D::new(geometry.width as f32, geometry.height as f32)
     }
 
     fn client_window(&self, _id: BrowserId) -> (Size2D<u32>, Point2D<i32>) {
-        let window = self.view.get_window().unwrap();
-        let width = window.get_width();
-        let height = window.get_height();
-        let (x, y) = window.get_position();
-        (Size2D::new(width as u32, height as u32), Point2D::new(x as i32, y as i32))
+        let geometry = self.get_geometry();
+
+        (Size2D::new(geometry.width as u32, geometry.height as u32),
+            Point2D::new(geometry.x as i32, geometry.y as i32))
     }
 
     fn set_page_title(&self, _id: BrowserId, title: Option<String>) {
@@ -129,8 +154,41 @@ impl WindowMethods for GtkWindow {
 
     fn set_cursor(&self, cursor: Cursor) {
         let cursor_name = match cursor {
+            Cursor::None => "none",
+            Cursor::Default => "default",
             Cursor::Pointer => "pointer",
-            _ => "default",
+            Cursor::ContextMenu => "context-menu",
+            Cursor::Help => "help",
+            Cursor::Progress => "progress",
+            Cursor::Wait => "wait",
+            Cursor::Cell => "cell",
+            Cursor::Crosshair => "crosshair",
+            Cursor::Text => "text",
+            Cursor::VerticalText => "vertical-text",
+            Cursor::Alias => "alias",
+            Cursor::Copy => "copy",
+            Cursor::Move => "move",
+            Cursor::NoDrop => "no-drop",
+            Cursor::NotAllowed => "not-allowed",
+            Cursor::Grab => "grab",
+            Cursor::Grabbing => "grabbing",
+            Cursor::EResize => "e-resize",
+            Cursor::NResize => "n-resize",
+            Cursor::NeResize => "ne-resize",
+            Cursor::NwResize => "nw-resize",
+            Cursor::SResize => "s-resize",
+            Cursor::SeResize => "se-resize",
+            Cursor::SwResize => "sw-resize",
+            Cursor::WResize => "w-resize",
+            Cursor::EwResize => "ew-resize",
+            Cursor::NsResize => "ns-resize",
+            Cursor::NeswResize => "nesw-resize",
+            Cursor::NwseResize => "nwse-resize",
+            Cursor::ColResize => "col-resize",
+            Cursor::RowResize => "row-resize",
+            Cursor::AllScroll => "all-scroll",
+            Cursor::ZoomIn => "zoom-in",
+            Cursor::ZoomOut => "zoom-out",
         };
         let display = Display::get_default().unwrap();
         let cursor = gdk::Cursor::new_from_name(&display, cursor_name);

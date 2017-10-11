@@ -24,6 +24,7 @@ use servo::compositing::windowing::{WindowEvent, WindowMethods};
 use servo::euclid::{TypedPoint2D, TypedVector2D};
 use servo::gl;
 use servo::ipc_channel::ipc;
+use servo::msg::constellation_msg::TraversalDirection;
 use servo::script_traits::TouchEventType;
 use servo::servo_config::resource_files::set_resources_path;
 use servo::servo_url::ServoUrl;
@@ -119,6 +120,33 @@ impl WebView {
         WebView {
             state,
         }
+    }
+
+    pub fn back(&self) {
+        with_servo!(self, |browser_id, servo| {
+            let event = WindowEvent::Navigation(browser_id, TraversalDirection::Back(1));
+            servo.handle_events(vec![event]);
+        });
+    }
+
+    pub fn forward(&self) {
+        with_servo!(self, |browser_id, servo| {
+            let event = WindowEvent::Navigation(browser_id, TraversalDirection::Forward(1));
+            servo.handle_events(vec![event]);
+        });
+    }
+
+    pub fn load(&self, url: &str) {
+        with_servo!(self, |browser_id, servo| {
+            match ServoUrl::parse(url) {
+                Ok(url) => {
+                    let event = WindowEvent::LoadUrl(browser_id, url);
+                    servo.handle_events(vec![event]);
+                },
+                // TODO: return an error.
+                Err(error) => println!("Error: {}", error),
+            }
+        });
     }
 
     fn prepare(state: Rc<RefCell<State>>) {

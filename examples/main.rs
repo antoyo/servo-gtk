@@ -2,9 +2,6 @@ extern crate gdk;
 extern crate gtk;
 extern crate servo_gtk;
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use gdk::enums::key;
 use gtk::{
     ContainerExt,
