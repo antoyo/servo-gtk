@@ -17,11 +17,17 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use gtk::{
+    Button,
+    ButtonExt,
     ContainerExt,
     Entry,
     EntryExt,
     Image,
     Inhibit,
+    Notebook,
+    NotebookExt,
+    NotebookExtManual,
+    PackType,
     SeparatorToolItem,
     Toolbar,
     ToolButton,
@@ -36,12 +42,26 @@ use gtk::{
 use gtk::Orientation::Vertical;
 use servo_gtk::WebView;
 
+macro_rules! with_tab {
+    ($tabs:expr, $webviews:expr, |$webview:ident| $block:block) => {
+        if let Some(page) = $tabs.get_current_page() {
+            let webviews = $webviews.borrow();
+            if let Some($webview) = webviews.get(page as usize) {
+                $block
+            }
+        }
+        // TODO: handle errors.
+    };
+}
+
 struct App {
     next_button: ToolButton,
+    new_tab_button: Button,
     previous_button: ToolButton,
     reload_button: ToolButton,
+    tabs: Notebook,
     url_entry: Entry,
-    webview: WebView,
+    webviews: Rc<RefCell<Vec<WebView>>>,
     window: Window,
 }
 
@@ -58,7 +78,8 @@ impl App {
             Inhibit(false)
         });
 
-        let webview = self.webview.clone();
+        let tabs = self.tabs.clone();
+        let webviews = self.webviews.clone();
         self.url_entry.connect_activate(move |entry| {
             let url = entry.get_text().unwrap();
             let url =
@@ -68,22 +89,45 @@ impl App {
                 else {
                     format!("http://{}", url)
                 };
-            webview.load(&url);
+            with_tab!(tabs, webviews, |webview| {
+                webview.load(&url);
+            });
         });
 
-        let webview = self.webview.clone();
+        let tabs = self.tabs.clone();
+        let webviews = self.webviews.clone();
         self.previous_button.connect_clicked(move |_| {
-            webview.back();
+            with_tab!(tabs, webviews, |webview| {
+                webview.back();
+            });
         });
 
-        let webview = self.webview.clone();
+        let tabs = self.tabs.clone();
+        let webviews = self.webviews.clone();
         self.next_button.connect_clicked(move |_| {
-            webview.forward();
+            with_tab!(tabs, webviews, |webview| {
+                webview.forward();
+            });
         });
 
-        let webview = self.webview.clone();
+        let tabs = self.tabs.clone();
+        let webviews = self.webviews.clone();
         self.reload_button.connect_clicked(move |_| {
-            webview.reload();
+            with_tab!(tabs, webviews, |webview| {
+                webview.reload();
+            });
+        });
+
+        let tabs = self.tabs.clone();
+        let webviews = self.webviews.clone();
+        self.new_tab_button.connect_clicked(move |_| {
+            let webview = WebView::new();
+            let view = webview.view();
+            view.set_vexpand(true);
+            tabs.add(&view);
+            tabs.set_tab_label_text(&view, "Tab");
+            view.show();
+            webviews.borrow_mut().push(webview);
         });
     }
 
@@ -116,10 +160,17 @@ impl App {
         url_tool_item.add(&url_entry);
         toolbar.add(&url_tool_item);
 
+        let tabs = Notebook::new();
+        let new_tab_button = Button::new();
+        new_tab_button.add(&icon("list-add"));
+        new_tab_button.show_all();
+        tabs.set_action_widget(&new_tab_button, PackType::End);
+        vbox.add(&tabs);
+
         let webview = WebView::new();
         let view = webview.view();
         view.set_vexpand(true);
-        vbox.add(&view);
+        tabs.add(&view);
 
         {
             let window = window.clone();
@@ -136,10 +187,12 @@ impl App {
 
         App {
             next_button,
+            new_tab_button,
             previous_button,
             reload_button,
+            tabs,
             url_entry,
-            webview,
+            webviews: Rc::new(RefCell::new(vec![webview])),
             window,
         }
     }

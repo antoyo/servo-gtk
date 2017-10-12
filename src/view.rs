@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::env;
 use std::ptr;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Once, ONCE_INIT};
 
 use epoxy;
 use gdk::{
@@ -34,7 +34,7 @@ use eventloop::GtkEventLoopWaker;
 use window::GtkWindow;
 
 macro_rules! with_servo {
-    ($_self:ident, | $browser_id:ident, $servo:ident | $block:block) => {
+    ($_self:ident, | $browser_id:ident, $servo:ident | $block:block, no_activate) => {
         let mut state = $_self.state.borrow_mut();
         if let Some($browser_id) = state.browser_id.clone() {
             if let Some(ref mut servo) = state.servo {
@@ -43,7 +43,13 @@ macro_rules! with_servo {
             }
         }
     };
+    ($_self:ident, | $browser_id:ident, $servo:ident | $block:block) => {
+        $_self.activate();
+        with_servo!($_self, |$browser_id, $servo| $block, no_activate);
+    };
 }
+
+static EPOXY_INIT: Once = ONCE_INIT;
 
 pub type View = GLArea;
 
@@ -83,14 +89,17 @@ impl WebView {
         view.add_events((POINTER_MOTION_MASK | SCROLL_MASK).bits() as i32);
         view.set_size_request(200, 200);
 
-        epoxy::load_with(|s| {
-            unsafe {
-                match DynamicLibrary::open(None).unwrap().symbol(s) {
-                    Ok(v) => v,
-                    Err(_) => ptr::null(),
+        EPOXY_INIT.call_once(|| {
+            epoxy::load_with(|s| {
+                unsafe {
+                    match DynamicLibrary::open(None).unwrap().symbol(s) {
+                        Ok(v) => v,
+                        Err(_) => ptr::null(),
+                    }
                 }
-            }
+            });
         });
+
         let gl = unsafe {
             gl::GlFns::load_with(epoxy::get_proc_addr)
         };
@@ -120,6 +129,14 @@ impl WebView {
         WebView {
             state,
         }
+    }
+
+    fn activate(&self) {
+        // FIXME: can we avoid calling this method everytime?
+        with_servo!(self, |browser_id, servo| {
+            let event = WindowEvent::SelectBrowser(browser_id);
+            servo.handle_events(vec![event]);
+        }, no_activate);
     }
 
     pub fn back(&self) {
