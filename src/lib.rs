@@ -1,3 +1,9 @@
+/*
+ * TODO: show the gtk scrollbars instead of the Servo scrollbars?
+ * TODO: key (WindowEvent::KeyEvent) and button events.
+ * TODO: send CloseBrowser event.
+ */
+
 extern crate epoxy;
 extern crate gdk;
 extern crate glib_itc;

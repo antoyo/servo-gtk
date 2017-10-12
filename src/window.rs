@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use gdk;
@@ -28,6 +29,7 @@ struct Allocation {
 
 pub struct GtkWindow {
     gl: Rc<gl::Gl>,
+    title_callback: RefCell<Option<Box<Fn(Option<String>)>>>,
     view: View,
     waker: Box<EventLoopWaker>,
 }
@@ -36,9 +38,14 @@ impl GtkWindow {
     pub fn new(gl: Rc<gl::Gl>, view: View, waker: Box<EventLoopWaker>) -> Self {
         GtkWindow {
             gl,
+            title_callback: RefCell::new(None),
             view,
             waker,
         }
+    }
+
+    pub fn connect_title_changed<F: Fn(Option<String>) + 'static>(&self, callback: F) {
+        *self.title_callback.borrow_mut() = Some(Box::new(callback));
     }
 
     fn get_geometry(&self) -> Allocation {
@@ -114,11 +121,9 @@ impl WindowMethods for GtkWindow {
     }
 
     fn set_page_title(&self, _id: BrowserId, title: Option<String>) {
-        let window = self.view.get_window().unwrap();
-        window.set_title(match title {
-            Some(ref title) => title,
-            None => "",
-        });
+        if let Some(ref callback) = *self.title_callback.borrow() {
+            callback(title);
+        }
     }
 
     fn allow_navigation(&self, _id: BrowserId, _url: ServoUrl, chan: ipc::IpcSender<bool>) {

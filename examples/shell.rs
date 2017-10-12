@@ -1,7 +1,18 @@
+/*
+ * TODO: show if tab is loading.
+ * TODO: update url in entry.
+ * TODO: zoom.
+ * TODO: favicon.
+ * TODO: handle history changed to enable/disable back/forward buttons.
+ * TODO: loading errors.
+ * TODO: show title on tabs.
+ */
+
 extern crate gdk;
 extern crate gtk;
 extern crate servo_gtk;
 
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -19,6 +30,7 @@ use gtk::{
     ToolItemExt,
     WidgetExt,
     Window,
+    WindowExt,
     WindowType,
 };
 use gtk::Orientation::Vertical;
@@ -109,7 +121,16 @@ impl App {
         view.set_vexpand(true);
         vbox.add(&view);
 
-        let webview = webview.clone();
+        {
+            let window = window.clone();
+            webview.connect_title_changed(move |title| {
+                let title: Cow<str> = match title {
+                    Some(ref title) => format!("{} - Servo Shell", title).into(),
+                    None => "Servo Shell".into(),
+                };
+                window.set_title(&title);
+            });
+        }
 
         window.show_all();
 

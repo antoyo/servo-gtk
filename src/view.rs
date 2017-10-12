@@ -129,6 +129,11 @@ impl WebView {
         });
     }
 
+    pub fn connect_title_changed<F: Fn(Option<String>) + 'static>(&self, callback: F) {
+        let state = self.state.borrow();
+        state.window.connect_title_changed(callback);
+    }
+
     pub fn forward(&self) {
         with_servo!(self, |browser_id, servo| {
             let event = WindowEvent::Navigation(browser_id, TraversalDirection::Forward(1));
