@@ -1,11 +1,9 @@
 /*
  * TODO: show if tab is loading.
- * TODO: update url in entry.
  * TODO: zoom.
  * TODO: favicon.
  * TODO: handle history changed to enable/disable back/forward buttons.
  * TODO: loading errors.
- * TODO: show title on tabs.
  */
 
 extern crate gdk;
@@ -19,6 +17,7 @@ use std::rc::Rc;
 use gtk::{
     Button,
     ButtonExt,
+    Cast,
     ContainerExt,
     Entry,
     EntryExt,
@@ -121,6 +120,7 @@ impl App {
         let tabs = self.tabs.clone();
         let webviews = self.webviews.clone();
         let window = self.window.clone();
+        let url_entry = self.url_entry.clone();
         self.new_tab_button.connect_clicked(move |_| {
             let webview = WebView::new();
             let view = webview.view();
@@ -128,8 +128,19 @@ impl App {
             tabs.add(&view);
             tabs.set_tab_label_text(&view, "New tab");
             view.show();
-            Self::webview_events(&tabs, &window, &webview);
+            Self::webview_events(&tabs, &window, &webview, &url_entry);
             webviews.borrow_mut().push(webview);
+        });
+
+        let webviews = self.webviews.clone();
+        let url_entry = self.url_entry.clone();
+        self.tabs.connect_switch_page(move |_, _, page| {
+            let webviews = webviews.borrow();
+            if let Some(webview) = webviews.get(page as usize) {
+                // TODO: change window title.
+                let url = webview.get_url().unwrap_or_default();
+                url_entry.set_text(&url);
+            }
         });
     }
 
@@ -189,24 +200,38 @@ impl App {
 
         let tabs = app.tabs.clone();
         let window = app.window.clone();
-        Self::webview_events(&tabs, &window, &webview);
+        let url_entry = app.url_entry.clone();
+        Self::webview_events(&tabs, &window, &webview, &url_entry);
 
         app
     }
 
-    fn webview_events(tabs: &Notebook, window: &Window, webview: &WebView) {
-        let tabs = tabs.clone();
-        let window = window.clone();
-        let view = webview.view();
-        webview.connect_title_changed(move |page_title| {
-            let title: Cow<str> = match page_title {
-                Some(ref title) => format!("{} - Servo Shell", title).into(),
-                None => "Servo Shell".into(),
-            };
-            window.set_title(&title);
-            let title = page_title.as_ref().map(String::as_str).unwrap_or("(no title)");
-            tabs.set_tab_label_text(&view, title);
-        });
+    fn webview_events(tabs: &Notebook, window: &Window, webview: &WebView, url_entry: &Entry) {
+        {
+            let tabs = tabs.clone();
+            let window = window.clone();
+            let view = webview.view();
+            webview.connect_title_changed(move |page_title| {
+                let title: Cow<str> = match page_title {
+                    Some(ref title) => format!("{} - Servo Shell", title).into(),
+                    None => "Servo Shell".into(),
+                };
+                window.set_title(&title);
+                let title = page_title.as_ref().map(String::as_str).unwrap_or("(no title)");
+                tabs.set_tab_label_text(&view, title);
+            });
+        }
+
+        {
+            let tabs = tabs.clone();
+            let view = webview.view();
+            let url_entry = url_entry.clone();
+            webview.connect_url_changed(move |url| {
+                if tabs.get_nth_page(tabs.get_current_page()) == Some(view.clone().upcast()) {
+                    url_entry.set_text(&url);
+                }
+            });
+        }
     }
 }
 

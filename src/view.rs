@@ -154,11 +154,21 @@ impl WebView {
         state.window.connect_title_changed(callback);
     }
 
+    pub fn connect_url_changed<F: Fn(String) + 'static>(&self, callback: F) {
+        let state = self.state.borrow();
+        state.window.connect_url_changed(callback);
+    }
+
     pub fn forward(&self) {
         with_servo!(self, |browser_id, servo| {
             let event = WindowEvent::Navigation(browser_id, TraversalDirection::Forward(1));
             servo.handle_events(vec![event]);
         });
+    }
+
+    pub fn get_url(&self) -> Option<String> {
+        let state = self.state.borrow();
+        state.window.get_url()
     }
 
     pub fn load(&self, url: &str) {

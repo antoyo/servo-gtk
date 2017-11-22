@@ -30,6 +30,8 @@ struct Allocation {
 pub struct GtkWindow {
     gl: Rc<gl::Gl>,
     title_callback: RefCell<Option<Box<Fn(Option<String>)>>>,
+    url: RefCell<Option<String>>,
+    url_callback: RefCell<Option<Box<Fn(String)>>>,
     view: View,
     waker: Box<EventLoopWaker>,
 }
@@ -39,6 +41,8 @@ impl GtkWindow {
         GtkWindow {
             gl,
             title_callback: RefCell::new(None),
+            url: RefCell::new(None),
+            url_callback: RefCell::new(None),
             view,
             waker,
         }
@@ -46,6 +50,10 @@ impl GtkWindow {
 
     pub fn connect_title_changed<F: Fn(Option<String>) + 'static>(&self, callback: F) {
         *self.title_callback.borrow_mut() = Some(Box::new(callback));
+    }
+
+    pub fn connect_url_changed<F: Fn(String) + 'static>(&self, callback: F) {
+        *self.url_callback.borrow_mut() = Some(Box::new(callback));
     }
 
     fn get_geometry(&self) -> Allocation {
@@ -69,6 +77,10 @@ impl GtkWindow {
             width,
             height,
         }
+    }
+
+    pub fn get_url(&self) -> Option<String> {
+        self.url.borrow().clone()
     }
 }
 
@@ -154,7 +166,13 @@ impl WindowMethods for GtkWindow {
     fn head_parsed(&self, _id: BrowserId) {
     }
 
-    fn history_changed(&self, _id: BrowserId, _entries: Vec<LoadData>, _current: usize) {
+    fn history_changed(&self, _id: BrowserId, entries: Vec<LoadData>, current: usize) {
+        if let Some(ref callback) = *self.url_callback.borrow() {
+            let url = &entries[current].url;
+            let url = url.as_str().to_string();
+            *self.url.borrow_mut() = Some(url.clone());
+            callback(url);
+        }
     }
 
     fn set_cursor(&self, cursor: Cursor) {
