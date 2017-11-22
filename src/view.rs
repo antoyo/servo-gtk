@@ -7,6 +7,8 @@ use std::sync::{Arc, Mutex, Once, ONCE_INIT};
 use epoxy;
 use gdk::{
     ScrollDirection,
+    BUTTON_PRESS_MASK,
+    BUTTON_RELEASE_MASK,
     POINTER_MOTION_MASK,
     SCROLL_MASK,
 };
@@ -20,7 +22,7 @@ use gtk::{
 };
 use servo;
 use servo::BrowserId;
-use servo::compositing::windowing::{WindowEvent, WindowMethods};
+use servo::compositing::windowing::{MouseWindowEvent, WindowEvent, WindowMethods};
 use servo::euclid::{TypedPoint2D, TypedVector2D};
 use servo::gl;
 use servo::ipc_channel::ipc;
@@ -30,6 +32,7 @@ use servo::servo_config::resource_files::set_resources_path;
 use servo::servo_url::ServoUrl;
 use shared_library::dynamic_library::DynamicLibrary;
 
+use convert;
 use eventloop::GtkEventLoopWaker;
 use window::GtkWindow;
 
@@ -86,7 +89,7 @@ impl WebView {
         let view = GLArea::new();
         view.set_auto_render(false);
         view.set_has_depth_buffer(true);
-        view.add_events((POINTER_MOTION_MASK | SCROLL_MASK).bits() as i32);
+        view.add_events((BUTTON_PRESS_MASK | BUTTON_RELEASE_MASK | POINTER_MOTION_MASK | SCROLL_MASK).bits() as i32);
         view.set_size_request(200, 200);
 
         EPOXY_INIT.call_once(|| {
@@ -181,6 +184,32 @@ impl WebView {
             state.borrow_mut().rx.connect_recv(move || {
                 servo.borrow_mut().handle_events(vec![]);
                 Continue(true)
+            });
+        }
+
+        {
+            let servo = servo.clone();
+            state.borrow().view.connect_button_press_event(move |_, event| {
+                let (x, y) = event.get_position();
+                let event = WindowEvent::MouseWindowEventClass(MouseWindowEvent::MouseDown(
+                        convert::mouse_button(event.get_button()), TypedPoint2D::new(x as f32, y as f32)));
+                servo.borrow_mut().handle_events(vec![event]);
+                Inhibit(false)
+            });
+        }
+
+        {
+            let servo = servo.clone();
+            state.borrow().view.connect_button_release_event(move |_, event| {
+                let (x, y) = event.get_position();
+                let button = convert::mouse_button(event.get_button());
+                let event = WindowEvent::MouseWindowEventClass(MouseWindowEvent::MouseUp(
+                        button, TypedPoint2D::new(x as f32, y as f32)));
+                servo.borrow_mut().handle_events(vec![event]);
+                let event = WindowEvent::MouseWindowEventClass(MouseWindowEvent::Click(
+                        button, TypedPoint2D::new(x as f32, y as f32)));
+                servo.borrow_mut().handle_events(vec![event]); // TODO: check if it is the right place to trigger this event.
+                Inhibit(false)
             });
         }
 

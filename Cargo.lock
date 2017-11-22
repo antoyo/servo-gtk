@@ -4,6 +4,7 @@ version = "0.1.0"
 dependencies = [
  "epoxy 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "gdk 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "gdk-sys 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "glib 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "glib-itc 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "gtk 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
