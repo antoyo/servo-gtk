@@ -120,13 +120,15 @@ impl App {
 
         let tabs = self.tabs.clone();
         let webviews = self.webviews.clone();
+        let window = self.window.clone();
         self.new_tab_button.connect_clicked(move |_| {
             let webview = WebView::new();
             let view = webview.view();
             view.set_vexpand(true);
             tabs.add(&view);
-            tabs.set_tab_label_text(&view, "Tab");
+            tabs.set_tab_label_text(&view, "New tab");
             view.show();
+            Self::webview_events(&tabs, &window, &webview);
             webviews.borrow_mut().push(webview);
         });
     }
@@ -172,29 +174,39 @@ impl App {
         view.set_vexpand(true);
         tabs.add(&view);
 
-        {
-            let window = window.clone();
-            webview.connect_title_changed(move |title| {
-                let title: Cow<str> = match title {
-                    Some(ref title) => format!("{} - Servo Shell", title).into(),
-                    None => "Servo Shell".into(),
-                };
-                window.set_title(&title);
-            });
-        }
-
         window.show_all();
 
-        App {
+        let app = App {
             next_button,
             new_tab_button,
             previous_button,
             reload_button,
             tabs,
             url_entry,
-            webviews: Rc::new(RefCell::new(vec![webview])),
+            webviews: Rc::new(RefCell::new(vec![webview.clone()])),
             window,
-        }
+        };
+
+        let tabs = app.tabs.clone();
+        let window = app.window.clone();
+        Self::webview_events(&tabs, &window, &webview);
+
+        app
+    }
+
+    fn webview_events(tabs: &Notebook, window: &Window, webview: &WebView) {
+        let tabs = tabs.clone();
+        let window = window.clone();
+        let view = webview.view();
+        webview.connect_title_changed(move |page_title| {
+            let title: Cow<str> = match page_title {
+                Some(ref title) => format!("{} - Servo Shell", title).into(),
+                None => "Servo Shell".into(),
+            };
+            window.set_title(&title);
+            let title = page_title.as_ref().map(String::as_str).unwrap_or("(no title)");
+            tabs.set_tab_label_text(&view, title);
+        });
     }
 }
 
