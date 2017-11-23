@@ -1,6 +1,6 @@
 /*
  * TODO: show the gtk scrollbars instead of the Servo scrollbars?
- * TODO: send CloseBrowser event.
+ * TODO: send CloseBrowser event (on tab close?).
  */
 
 extern crate epoxy;

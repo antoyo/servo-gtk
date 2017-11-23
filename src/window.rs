@@ -27,12 +27,16 @@ struct Allocation {
     height: u32,
 }
 
+struct State {
+    title: Option<String>,
+    title_callback: Option<Box<Fn(Option<String>)>>,
+    url: Option<String>,
+    url_callback: Option<Box<Fn(String)>>,
+}
+
 pub struct GtkWindow {
     gl: Rc<gl::Gl>,
-    title: RefCell<Option<String>>,
-    title_callback: RefCell<Option<Box<Fn(Option<String>)>>>,
-    url: RefCell<Option<String>>,
-    url_callback: RefCell<Option<Box<Fn(String)>>>,
+    state: RefCell<State>,
     view: View,
     waker: Box<EventLoopWaker>,
 }
@@ -41,21 +45,23 @@ impl GtkWindow {
     pub fn new(gl: Rc<gl::Gl>, view: View, waker: Box<EventLoopWaker>) -> Self {
         GtkWindow {
             gl,
-            title: RefCell::new(None),
-            title_callback: RefCell::new(None),
-            url: RefCell::new(None),
-            url_callback: RefCell::new(None),
+            state: RefCell::new(State {
+                title: None,
+                title_callback: None,
+                url: None,
+                url_callback: None,
+            }),
             view,
             waker,
         }
     }
 
     pub fn connect_title_changed<F: Fn(Option<String>) + 'static>(&self, callback: F) {
-        *self.title_callback.borrow_mut() = Some(Box::new(callback));
+        self.state.borrow_mut().title_callback = Some(Box::new(callback));
     }
 
     pub fn connect_url_changed<F: Fn(String) + 'static>(&self, callback: F) {
-        *self.url_callback.borrow_mut() = Some(Box::new(callback));
+        self.state.borrow_mut().url_callback = Some(Box::new(callback));
     }
 
     fn get_geometry(&self) -> Allocation {
@@ -82,11 +88,11 @@ impl GtkWindow {
     }
 
     pub fn get_title(&self) -> Option<String> {
-        self.title.borrow().clone()
+        self.state.borrow().title.clone()
     }
 
     pub fn get_url(&self) -> Option<String> {
-        self.url.borrow().clone()
+        self.state.borrow().url.clone()
     }
 }
 
@@ -139,8 +145,9 @@ impl WindowMethods for GtkWindow {
     }
 
     fn set_page_title(&self, _id: BrowserId, title: Option<String>) {
-        *self.title.borrow_mut() = title.clone();
-        if let Some(ref callback) = *self.title_callback.borrow() {
+        let mut state = self.state.borrow_mut();
+        state.title = title.clone();
+        if let Some(ref callback) = state.title_callback {
             callback(title);
         }
     }
@@ -176,8 +183,9 @@ impl WindowMethods for GtkWindow {
     fn history_changed(&self, _id: BrowserId, entries: Vec<LoadData>, current: usize) {
         let url = &entries[current].url;
         let url = url.as_str().to_string();
-        *self.url.borrow_mut() = Some(url.clone());
-        if let Some(ref callback) = *self.url_callback.borrow() {
+        let mut state = self.state.borrow_mut();
+        state.url = Some(url.clone());
+        if let Some(ref callback) = state.url_callback {
             callback(url);
         }
     }
