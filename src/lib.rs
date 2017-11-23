@@ -1,6 +1,5 @@
 /*
  * TODO: show the gtk scrollbars instead of the Servo scrollbars?
- * TODO: key (WindowEvent::KeyEvent) and button events.
  * TODO: send CloseBrowser event.
  */
 

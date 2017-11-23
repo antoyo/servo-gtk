@@ -26,7 +26,7 @@ use servo::compositing::windowing::{MouseWindowEvent, WindowEvent, WindowMethods
 use servo::euclid::{TypedPoint2D, TypedVector2D};
 use servo::gl;
 use servo::ipc_channel::ipc;
-use servo::msg::constellation_msg::TraversalDirection;
+use servo::msg::constellation_msg::{KeyState, TraversalDirection};
 use servo::script_traits::TouchEventType;
 use servo::servo_config::resource_files::set_resources_path;
 use servo::servo_url::ServoUrl;
@@ -90,6 +90,7 @@ impl WebView {
         view.set_auto_render(false);
         view.set_has_depth_buffer(true);
         view.add_events((BUTTON_PRESS_MASK | BUTTON_RELEASE_MASK | POINTER_MOTION_MASK | SCROLL_MASK).bits() as i32);
+        view.set_can_focus(true);
         view.set_size_request(200, 200);
 
         EPOXY_INIT.call_once(|| {
@@ -204,7 +205,35 @@ impl WebView {
 
         {
             let servo = servo.clone();
+            state.borrow().view.connect_key_press_event(move |_, event| {
+                let (char, key) = convert::key(event.get_keyval());
+                if let Some(key) = key {
+                    let modifiers = convert::modifiers(event.get_state());
+                    let event = WindowEvent::KeyEvent(char, key, KeyState::Pressed, modifiers);
+                    servo.borrow_mut().handle_events(vec![event]);
+                }
+                Inhibit(false)
+            });
+        }
+
+        {
+            let servo = servo.clone();
+            state.borrow().view.connect_key_release_event(move |_, event| {
+                let (char, key) = convert::key(event.get_keyval());
+                if let Some(key) = key {
+                    let modifiers = convert::modifiers(event.get_state());
+                    let event = WindowEvent::KeyEvent(char, key, KeyState::Released, modifiers);
+                    servo.borrow_mut().handle_events(vec![event]);
+                }
+                Inhibit(false)
+            });
+        }
+
+        {
+            let servo = servo.clone();
+            let view = state.borrow().view.clone();
             state.borrow().view.connect_button_press_event(move |_, event| {
+                view.grab_focus();
                 let (x, y) = event.get_position();
                 let event = WindowEvent::MouseWindowEventClass(MouseWindowEvent::MouseDown(
                         convert::mouse_button(event.get_button()), TypedPoint2D::new(x as f32, y as f32)));
