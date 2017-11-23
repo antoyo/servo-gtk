@@ -29,6 +29,7 @@ struct Allocation {
 
 pub struct GtkWindow {
     gl: Rc<gl::Gl>,
+    title: RefCell<Option<String>>,
     title_callback: RefCell<Option<Box<Fn(Option<String>)>>>,
     url: RefCell<Option<String>>,
     url_callback: RefCell<Option<Box<Fn(String)>>>,
@@ -40,6 +41,7 @@ impl GtkWindow {
     pub fn new(gl: Rc<gl::Gl>, view: View, waker: Box<EventLoopWaker>) -> Self {
         GtkWindow {
             gl,
+            title: RefCell::new(None),
             title_callback: RefCell::new(None),
             url: RefCell::new(None),
             url_callback: RefCell::new(None),
@@ -77,6 +79,10 @@ impl GtkWindow {
             width,
             height,
         }
+    }
+
+    pub fn get_title(&self) -> Option<String> {
+        self.title.borrow().clone()
     }
 
     pub fn get_url(&self) -> Option<String> {
@@ -133,6 +139,7 @@ impl WindowMethods for GtkWindow {
     }
 
     fn set_page_title(&self, _id: BrowserId, title: Option<String>) {
+        *self.title.borrow_mut() = title.clone();
         if let Some(ref callback) = *self.title_callback.borrow() {
             callback(title);
         }
@@ -167,10 +174,10 @@ impl WindowMethods for GtkWindow {
     }
 
     fn history_changed(&self, _id: BrowserId, entries: Vec<LoadData>, current: usize) {
+        let url = &entries[current].url;
+        let url = url.as_str().to_string();
+        *self.url.borrow_mut() = Some(url.clone());
         if let Some(ref callback) = *self.url_callback.borrow() {
-            let url = &entries[current].url;
-            let url = url.as_str().to_string();
-            *self.url.borrow_mut() = Some(url.clone());
             callback(url);
         }
     }

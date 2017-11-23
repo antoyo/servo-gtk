@@ -166,6 +166,11 @@ impl WebView {
         });
     }
 
+    pub fn get_title(&self) -> Option<String> {
+        let state = self.state.borrow();
+        state.window.get_title()
+    }
+
     pub fn get_url(&self) -> Option<String> {
         let state = self.state.borrow();
         state.window.get_url()

@@ -40,6 +40,7 @@ use gtk::{
 };
 use gtk::Orientation::Vertical;
 use servo_gtk::WebView;
+use servo_gtk::view::View;
 
 macro_rules! with_tab {
     ($tabs:expr, $webviews:expr, |$webview:ident| $block:block) => {
@@ -132,14 +133,17 @@ impl App {
             webviews.borrow_mut().push(webview);
         });
 
+        let window = self.window.clone();
         let webviews = self.webviews.clone();
         let url_entry = self.url_entry.clone();
         self.tabs.connect_switch_page(move |_, _, page| {
             let webviews = webviews.borrow();
             if let Some(webview) = webviews.get(page as usize) {
-                // TODO: change window title.
                 let url = webview.get_url().unwrap_or_default();
                 url_entry.set_text(&url);
+
+                let title = webview.get_title().unwrap_or_else(|| "Servo Shell".to_string());
+                window.set_title(&title);
             }
         });
     }
@@ -216,7 +220,9 @@ impl App {
                     Some(ref title) => format!("{} - Servo Shell", title).into(),
                     None => "Servo Shell".into(),
                 };
-                window.set_title(&title);
+                if current_tab_active(&tabs, &view) {
+                    window.set_title(&title);
+                }
                 let title = page_title.as_ref().map(String::as_str).unwrap_or("(no title)");
                 tabs.set_tab_label_text(&view, title);
             });
@@ -227,7 +233,7 @@ impl App {
             let view = webview.view();
             let url_entry = url_entry.clone();
             webview.connect_url_changed(move |url| {
-                if tabs.get_nth_page(tabs.get_current_page()) == Some(view.clone().upcast()) {
+                if current_tab_active(&tabs, &view) {
                     url_entry.set_text(&url);
                 }
             });
@@ -245,4 +251,8 @@ fn main() {
 
 fn icon(name: &str) -> Image {
     Image::new_from_file(format!("images/{}.png", name))
+}
+
+fn current_tab_active(tabs: &Notebook, view: &View) -> bool {
+    tabs.get_nth_page(tabs.get_current_page()) == Some(view.clone().upcast())
 }
