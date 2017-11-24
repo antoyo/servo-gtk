@@ -1,6 +1,7 @@
 /*
+ * TODO: zoom (+, -, 100%).
+ * TODO: close tab.
  * TODO: show if tab is loading.
- * TODO: zoom.
  * TODO: favicon.
  * TODO: loading errors.
  */
@@ -13,6 +14,8 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use gdk::CONTROL_MASK;
+use gdk::enums::key;
 use gtk::{
     Button,
     ButtonExt,
@@ -77,6 +80,18 @@ impl App {
     }
 
     fn events(&self) {
+        let url_entry = self.widgets.url_entry.clone();
+        self.widgets.window.connect_key_press_event(move |_, event| {
+            let s = event.get_state();
+            if event.get_state().contains(CONTROL_MASK) {
+                match event.get_keyval() {
+                    key::l => url_entry.grab_focus(),
+                    _ => (),
+                }
+            }
+            Inhibit(false)
+        });
+
         self.widgets.window.connect_delete_event(|_, _| {
             gtk::main_quit();
             Inhibit(false)
