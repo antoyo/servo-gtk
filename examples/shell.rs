@@ -81,11 +81,14 @@ impl App {
 
     fn events(&self) {
         let url_entry = self.widgets.url_entry.clone();
+        let tabs = self.widgets.tabs.clone();
+        let webviews = self.webviews.clone();
+        let widgets = self.widgets.clone();
         self.widgets.window.connect_key_press_event(move |_, event| {
-            let s = event.get_state();
             if event.get_state().contains(CONTROL_MASK) {
                 match event.get_keyval() {
                     key::l => url_entry.grab_focus(),
+                    key::t => Self::new_tab(&tabs, &webviews, &widgets),
                     _ => (),
                 }
             }
@@ -141,14 +144,7 @@ impl App {
         let webviews = self.webviews.clone();
         let widgets = self.widgets.clone();
         self.widgets.new_tab_button.connect_clicked(move |_| {
-            let webview = WebView::new();
-            let view = webview.view();
-            view.set_vexpand(true);
-            tabs.add(&view);
-            tabs.set_tab_label_text(&view, "New tab");
-            view.show();
-            Self::webview_events(&widgets, &webview);
-            webviews.borrow_mut().push(webview);
+            Self::new_tab(&tabs, &webviews, &widgets);
         });
 
         let previous_button = self.widgets.previous_button.clone();
@@ -169,6 +165,17 @@ impl App {
                 next_button.set_sensitive(webview.can_go_forward());
             }
         });
+    }
+
+    fn new_tab(tabs: &Notebook, webviews: &Rc<RefCell<Vec<WebView>>>, widgets: &Widgets) {
+        let webview = WebView::new();
+        let view = webview.view();
+        view.set_vexpand(true);
+        tabs.add(&view);
+        tabs.set_tab_label_text(&view, "New tab");
+        view.show();
+        Self::webview_events(&widgets, &webview);
+        webviews.borrow_mut().push(webview);
     }
 
     fn view() -> App {
