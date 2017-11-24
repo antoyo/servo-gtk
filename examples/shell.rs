@@ -2,7 +2,6 @@
  * TODO: show if tab is loading.
  * TODO: zoom.
  * TODO: favicon.
- * TODO: handle history changed to enable/disable back/forward buttons.
  * TODO: loading errors.
  */
 
@@ -54,15 +53,20 @@ macro_rules! with_tab {
     };
 }
 
-struct App {
+#[derive(Clone)]
+struct Widgets {
     next_button: ToolButton,
     new_tab_button: Button,
     previous_button: ToolButton,
     reload_button: ToolButton,
     tabs: Notebook,
     url_entry: Entry,
-    webviews: Rc<RefCell<Vec<WebView>>>,
     window: Window,
+}
+
+struct App {
+    webviews: Rc<RefCell<Vec<WebView>>>,
+    widgets: Rc<Widgets>,
 }
 
 impl App {
@@ -73,14 +77,14 @@ impl App {
     }
 
     fn events(&self) {
-        self.window.connect_delete_event(|_, _| {
+        self.widgets.window.connect_delete_event(|_, _| {
             gtk::main_quit();
             Inhibit(false)
         });
 
-        let tabs = self.tabs.clone();
+        let tabs = self.widgets.tabs.clone();
         let webviews = self.webviews.clone();
-        self.url_entry.connect_activate(move |entry| {
+        self.widgets.url_entry.connect_activate(move |entry| {
             let url = entry.get_text().unwrap();
             let url =
                 if url.contains("://") {
@@ -94,49 +98,50 @@ impl App {
             });
         });
 
-        let tabs = self.tabs.clone();
+        let tabs = self.widgets.tabs.clone();
         let webviews = self.webviews.clone();
-        self.previous_button.connect_clicked(move |_| {
+        self.widgets.previous_button.connect_clicked(move |_| {
             with_tab!(tabs, webviews, |webview| {
                 webview.back();
             });
         });
 
-        let tabs = self.tabs.clone();
+        let tabs = self.widgets.tabs.clone();
         let webviews = self.webviews.clone();
-        self.next_button.connect_clicked(move |_| {
+        self.widgets.next_button.connect_clicked(move |_| {
             with_tab!(tabs, webviews, |webview| {
                 webview.forward();
             });
         });
 
-        let tabs = self.tabs.clone();
+        let tabs = self.widgets.tabs.clone();
         let webviews = self.webviews.clone();
-        self.reload_button.connect_clicked(move |_| {
+        self.widgets.reload_button.connect_clicked(move |_| {
             with_tab!(tabs, webviews, |webview| {
                 webview.reload();
             });
         });
 
-        let tabs = self.tabs.clone();
+        let tabs = self.widgets.tabs.clone();
         let webviews = self.webviews.clone();
-        let window = self.window.clone();
-        let url_entry = self.url_entry.clone();
-        self.new_tab_button.connect_clicked(move |_| {
+        let widgets = self.widgets.clone();
+        self.widgets.new_tab_button.connect_clicked(move |_| {
             let webview = WebView::new();
             let view = webview.view();
             view.set_vexpand(true);
             tabs.add(&view);
             tabs.set_tab_label_text(&view, "New tab");
             view.show();
-            Self::webview_events(&tabs, &window, &webview, &url_entry);
+            Self::webview_events(&widgets, &webview);
             webviews.borrow_mut().push(webview);
         });
 
-        let window = self.window.clone();
+        let previous_button = self.widgets.previous_button.clone();
+        let next_button = self.widgets.next_button.clone();
+        let window = self.widgets.window.clone();
         let webviews = self.webviews.clone();
-        let url_entry = self.url_entry.clone();
-        self.tabs.connect_switch_page(move |_, _, page| {
+        let url_entry = self.widgets.url_entry.clone();
+        self.widgets.tabs.connect_switch_page(move |_, _, page| {
             let webviews = webviews.borrow();
             if let Some(webview) = webviews.get(page as usize) {
                 let url = webview.get_url().unwrap_or_default();
@@ -144,6 +149,9 @@ impl App {
 
                 let title = webview.get_title().unwrap_or_else(|| "Servo Shell".to_string());
                 window.set_title(&title);
+
+                previous_button.set_sensitive(webview.can_go_back());
+                next_button.set_sensitive(webview.can_go_forward());
             }
         });
     }
@@ -191,29 +199,30 @@ impl App {
 
         window.show_all();
 
-        let app = App {
+        let widgets = Rc::new(Widgets {
             next_button,
             new_tab_button,
             previous_button,
             reload_button,
             tabs,
             url_entry,
-            webviews: Rc::new(RefCell::new(vec![webview.clone()])),
             window,
+        });
+
+        let app = App {
+            webviews: Rc::new(RefCell::new(vec![webview.clone()])),
+            widgets: widgets.clone(),
         };
 
-        let tabs = app.tabs.clone();
-        let window = app.window.clone();
-        let url_entry = app.url_entry.clone();
-        Self::webview_events(&tabs, &window, &webview, &url_entry);
+        Self::webview_events(&widgets, &webview);
 
         app
     }
 
-    fn webview_events(tabs: &Notebook, window: &Window, webview: &WebView, url_entry: &Entry) {
+    fn webview_events(widgets: &Widgets, webview: &WebView) {
         {
-            let tabs = tabs.clone();
-            let window = window.clone();
+            let tabs = widgets.tabs.clone();
+            let window = widgets.window.clone();
             let view = webview.view();
             webview.connect_title_changed(move |page_title| {
                 let title: Cow<str> = match page_title {
@@ -229,11 +238,16 @@ impl App {
         }
 
         {
-            let tabs = tabs.clone();
+            let previous_button = widgets.previous_button.clone();
+            let next_button = widgets.next_button.clone();
+            let tabs = widgets.tabs.clone();
+            let wview = webview.clone();
             let view = webview.view();
-            let url_entry = url_entry.clone();
+            let url_entry = widgets.url_entry.clone();
             webview.connect_url_changed(move |url| {
                 if current_tab_active(&tabs, &view) {
+                    previous_button.set_sensitive(wview.can_go_back());
+                    next_button.set_sensitive(wview.can_go_forward());
                     url_entry.set_text(&url);
                 }
             });

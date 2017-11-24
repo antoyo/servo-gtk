@@ -150,6 +150,16 @@ impl WebView {
         });
     }
 
+    pub fn can_go_back(&self) -> bool {
+        let state = self.state.borrow();
+        state.window.can_go_back()
+    }
+
+    pub fn can_go_forward(&self) -> bool {
+        let state = self.state.borrow();
+        state.window.can_go_forward()
+    }
+
     pub fn connect_title_changed<F: Fn(Option<String>) + 'static>(&self, callback: F) {
         let state = self.state.borrow();
         state.window.connect_title_changed(callback);
