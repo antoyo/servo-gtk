@@ -1,4 +1,5 @@
 /*
+ * TODO: shortcut to go to next/previous tab.
  * TODO: zoom (+, -, 100%).
  * TODO: close tab.
  * TODO: show if tab is loading.
@@ -67,8 +68,10 @@ struct Widgets {
     window: Window,
 }
 
+type WebViews = Rc<RefCell<Vec<WebView>>>;
+
 struct App {
-    webviews: Rc<RefCell<Vec<WebView>>>,
+    webviews: WebViews,
     widgets: Rc<Widgets>,
 }
 
@@ -77,6 +80,18 @@ impl App {
         let app = Self::view();
         app.events();
         app
+    }
+
+    fn close_tab(tabs: &Notebook, webviews: &WebViews, widgets: &Widgets) {
+        let page = tabs.get_current_page();
+        tabs.remove_page(page);
+        if let Some(page) = page {
+            let webview = webviews.borrow_mut().remove(page as usize);
+            if webviews.borrow().is_empty() {
+                Self::new_tab(tabs, webviews, widgets);
+            }
+            webview.close();
+        }
     }
 
     fn events(&self) {
@@ -89,6 +104,7 @@ impl App {
                 match event.get_keyval() {
                     key::l => url_entry.grab_focus(),
                     key::t => Self::new_tab(&tabs, &webviews, &widgets),
+                    key::w => Self::close_tab(&tabs, &webviews, &widgets),
                     _ => (),
                 }
             }
@@ -167,7 +183,7 @@ impl App {
         });
     }
 
-    fn new_tab(tabs: &Notebook, webviews: &Rc<RefCell<Vec<WebView>>>, widgets: &Widgets) {
+    fn new_tab(tabs: &Notebook, webviews: &WebViews, widgets: &Widgets) {
         let webview = WebView::new();
         let view = webview.view();
         view.set_vexpand(true);
@@ -231,12 +247,12 @@ impl App {
             window,
         });
 
+        Self::webview_events(&widgets, &webview);
+
         let app = App {
-            webviews: Rc::new(RefCell::new(vec![webview.clone()])),
+            webviews: Rc::new(RefCell::new(vec![webview])),
             widgets: widgets.clone(),
         };
-
-        Self::webview_events(&widgets, &webview);
 
         app
     }

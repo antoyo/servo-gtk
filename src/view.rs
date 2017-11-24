@@ -160,6 +160,15 @@ impl WebView {
         state.window.can_go_forward()
     }
 
+    pub fn close(&self) {
+        // FIXME: warning.
+        // FIXME: should change the url (i.e. because it triggers page switch).
+        with_servo!(self, |browser_id, servo| {
+            let event = WindowEvent::CloseBrowser(browser_id);
+            servo.handle_events(vec![event]);
+        });
+    }
+
     pub fn connect_title_changed<F: Fn(Option<String>) + 'static>(&self, callback: F) {
         let state = self.state.borrow();
         state.window.connect_title_changed(callback);
