@@ -1,9 +1,8 @@
 /*
- * TODO: shortcut to go to next/previous tab.
- * TODO: close tab.
  * TODO: show if tab is loading.
  * TODO: favicon.
  * TODO: loading errors.
+ * TODO: close tab.
  */
 
 extern crate gdk;
@@ -107,6 +106,8 @@ impl App {
                         });
                     },
                     key::l => url_entry.grab_focus(),
+                    key::Page_Down => tabs.next_page(),
+                    key::Page_Up => tabs.prev_page(),
                     key::t => Self::new_tab(&tabs, &webviews, &widgets),
                     key::w => Self::close_tab(&tabs, &webviews, &widgets),
                     _ => (),
