@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use gdk;
@@ -28,8 +28,8 @@ struct Allocation {
 }
 
 pub struct GtkWindow {
-    can_go_back: RefCell<bool>,
-    can_go_forward: RefCell<bool>,
+    can_go_back: Cell<bool>,
+    can_go_forward: Cell<bool>,
     gl: Rc<gl::Gl>,
     title: RefCell<Option<String>>,
     title_callback: RefCell<Option<Box<Fn(Option<String>)>>>,
@@ -42,8 +42,8 @@ pub struct GtkWindow {
 impl GtkWindow {
     pub fn new(gl: Rc<gl::Gl>, view: View, waker: Box<EventLoopWaker>) -> Self {
         GtkWindow {
-            can_go_back: RefCell::new(false),
-            can_go_forward: RefCell::new(false),
+            can_go_back: Cell::new(false),
+            can_go_forward: Cell::new(false),
             gl,
             title: RefCell::new(None),
             title_callback: RefCell::new(None),
@@ -55,11 +55,11 @@ impl GtkWindow {
     }
 
     pub fn can_go_back(&self) -> bool {
-        *self.can_go_back.borrow()
+        self.can_go_back.get()
     }
 
     pub fn can_go_forward(&self) -> bool {
-        *self.can_go_forward.borrow()
+        self.can_go_forward.get()
     }
 
     pub fn connect_title_changed<F: Fn(Option<String>) + 'static>(&self, callback: F) {
@@ -186,8 +186,8 @@ impl WindowMethods for GtkWindow {
     }
 
     fn history_changed(&self, _id: BrowserId, entries: Vec<LoadData>, current: usize) {
-        *self.can_go_back.borrow_mut() = !entries.is_empty() && current > 0;
-        *self.can_go_forward.borrow_mut() = !entries.is_empty() && current < entries.len() - 1;
+        self.can_go_back.set(!entries.is_empty() && current > 0);
+        self.can_go_forward.set(!entries.is_empty() && current < entries.len() - 1);
         let url = &entries[current].url;
         let url = url.as_str().to_string();
         *self.url.borrow_mut() = Some(url.clone());

@@ -1,6 +1,5 @@
 /*
  * TODO: shortcut to go to next/previous tab.
- * TODO: zoom (+, -, 100%).
  * TODO: close tab.
  * TODO: show if tab is loading.
  * TODO: favicon.
@@ -15,7 +14,7 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gdk::CONTROL_MASK;
+use gdk::{ScrollDirection, CONTROL_MASK};
 use gdk::enums::key;
 use gtk::{
     Button,
@@ -102,6 +101,11 @@ impl App {
         self.widgets.window.connect_key_press_event(move |_, event| {
             if event.get_state().contains(CONTROL_MASK) {
                 match event.get_keyval() {
+                    key::_0 => {
+                        with_tab!(tabs, webviews, |webview| {
+                            webview.reset_zoom();
+                        });
+                    },
                     key::l => url_entry.grab_focus(),
                     key::t => Self::new_tab(&tabs, &webviews, &widgets),
                     key::w => Self::close_tab(&tabs, &webviews, &widgets),
@@ -272,6 +276,23 @@ impl App {
                 }
                 let title = page_title.as_ref().map(String::as_str).unwrap_or("(no title)");
                 tabs.set_tab_label_text(&view, title);
+            });
+        }
+
+        {
+            let view = webview.clone();
+            webview.view().connect_scroll_event(move |_, event| {
+                if event.get_state().contains(CONTROL_MASK) {
+                    let step = match event.get_direction() {
+                        ScrollDirection::Down => -0.1,
+                        ScrollDirection::Up => 0.1,
+                        _ => return Inhibit(false),
+                    };
+
+                    view.zoom(step);
+                }
+
+                Inhibit(false)
             });
         }
 

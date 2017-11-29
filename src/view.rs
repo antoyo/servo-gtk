@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::env;
 use std::ptr;
 use std::rc::Rc;
@@ -9,6 +9,7 @@ use gdk::{
     ScrollDirection,
     BUTTON_PRESS_MASK,
     BUTTON_RELEASE_MASK,
+    CONTROL_MASK,
     POINTER_MOTION_MASK,
     SCROLL_MASK,
 };
@@ -77,6 +78,7 @@ struct State {
     servo: Option<Rc<RefCell<servo::Servo<GtkWindow>>>>,
     view: View,
     window: Rc<GtkWindow>,
+    zoom_level: Cell<f32>,
 }
 
 #[derive(Clone)]
@@ -121,6 +123,7 @@ impl WebView {
             servo: None,
             view: view.clone(),
             window,
+            zoom_level: Cell::new(1.0),
         }));
 
         {
@@ -194,6 +197,11 @@ impl WebView {
     pub fn get_url(&self) -> Option<String> {
         let state = self.state.borrow();
         state.window.get_url()
+    }
+
+    pub fn get_zoom(&self) -> f32 {
+        let state = self.state.borrow();
+        state.zoom_level.get()
     }
 
     pub fn load(&self, url: &str) {
@@ -303,28 +311,31 @@ impl WebView {
             let inner_state = state.clone();
             let servo = servo.clone();
             state.borrow().view.connect_scroll_event(move |_, event| {
-                let phase = match event.get_direction() {
-                    ScrollDirection::Down => TouchEventType::Down,
-                    ScrollDirection::Up => TouchEventType::Up,
-                    ScrollDirection::Left => TouchEventType::Cancel, // FIXME
-                    ScrollDirection::Right => TouchEventType::Cancel, // FIXME
-                    ScrollDirection::Smooth | _ => TouchEventType::Cancel, // FIXME
-                };
-                let dx = 0.0;
-                let dy =
-                    match phase {
-                        TouchEventType::Up => 1.0,
-                        TouchEventType::Down => -1.0,
-                        _ => 0.0,
+                let state = event.get_state();
+                if !state.contains(CONTROL_MASK) {
+                    let phase = match event.get_direction() {
+                        ScrollDirection::Down => TouchEventType::Down,
+                        ScrollDirection::Up => TouchEventType::Up,
+                        ScrollDirection::Left => TouchEventType::Cancel, // FIXME
+                        ScrollDirection::Right => TouchEventType::Cancel, // FIXME
+                        ScrollDirection::Smooth | _ => TouchEventType::Cancel, // FIXME
                     };
-                let dy = dy * 38.0;
-                let pointer = {
-                    let pointer = &inner_state.borrow().pointer;
-                    TypedPoint2D::new(pointer.x as i32, pointer.y as i32)
-                };
-                let scroll_location = servo::webrender_api::ScrollLocation::Delta(TypedVector2D::new(dx as f32, dy as f32));
-                let event = WindowEvent::Scroll(scroll_location, pointer, phase);
-                servo.borrow_mut().handle_events(vec![event]);
+                    let dx = 0.0;
+                    let dy =
+                        match phase {
+                            TouchEventType::Up => 1.0,
+                            TouchEventType::Down => -1.0,
+                            _ => 0.0,
+                        };
+                    let dy = dy * 38.0;
+                    let pointer = {
+                        let pointer = &inner_state.borrow().pointer;
+                        TypedPoint2D::new(pointer.x as i32, pointer.y as i32)
+                    };
+                    let scroll_location = servo::webrender_api::ScrollLocation::Delta(TypedVector2D::new(dx as f32, dy as f32));
+                    let event = WindowEvent::Scroll(scroll_location, pointer, phase);
+                    servo.borrow_mut().handle_events(vec![event]);
+                }
                 Inhibit(false)
             });
         }
@@ -346,6 +357,27 @@ impl WebView {
         with_servo!(self, |browser_id, servo| {
             let event = WindowEvent::Reload(browser_id);
             servo.handle_events(vec![event]);
+        });
+    }
+
+    pub fn reset_zoom(&self) {
+        {
+            let state = self.state.borrow();
+            state.zoom_level.set(1.0);
+        }
+        with_servo!(self, |_browser_id, servo| {
+            servo.handle_events(vec![WindowEvent::ResetZoom]);
+        });
+    }
+
+    pub fn zoom(&self, step: f32) {
+        let step = step + 1.0;
+        {
+            let state = self.state.borrow();
+            state.zoom_level.set(state.zoom_level.get() * step);
+        }
+        with_servo!(self, |_browser_id, servo| {
+            servo.handle_events(vec![WindowEvent::Zoom(step)]);
         });
     }
 
