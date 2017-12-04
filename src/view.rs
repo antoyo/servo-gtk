@@ -6,13 +6,10 @@ use std::sync::{Arc, Mutex, Once, ONCE_INIT};
 
 use epoxy;
 use gdk::{
+    EventMask,
     ScrollDirection,
-    BUTTON_PRESS_MASK,
-    BUTTON_RELEASE_MASK,
-    CONTROL_MASK,
-    POINTER_MOTION_MASK,
-    SCROLL_MASK,
 };
+use gdk::ModifierType;
 use glib_itc::{Receiver, channel};
 use gtk::{
     Continue,
@@ -23,7 +20,7 @@ use gtk::{
 };
 use servo;
 use servo::BrowserId;
-use servo::compositing::windowing::{MouseWindowEvent, WindowEvent, WindowMethods};
+use servo::compositing::windowing::{MouseWindowEvent, WindowEvent};
 use servo::euclid::{TypedPoint2D, TypedVector2D};
 use servo::gl;
 use servo::ipc_channel::ipc;
@@ -91,7 +88,8 @@ impl WebView {
         let view = GLArea::new();
         view.set_auto_render(false);
         view.set_has_depth_buffer(true);
-        view.add_events((BUTTON_PRESS_MASK | BUTTON_RELEASE_MASK | POINTER_MOTION_MASK | SCROLL_MASK).bits() as i32);
+        view.add_events((EventMask::BUTTON_PRESS_MASK | EventMask::BUTTON_RELEASE_MASK | EventMask::POINTER_MOTION_MASK
+            | EventMask::SCROLL_MASK).bits() as i32);
         view.set_can_focus(true);
         view.set_size_request(200, 200);
 
@@ -299,11 +297,9 @@ impl WebView {
         }
 
         {
-            let inner_state = state.clone();
             let servo = servo.clone();
             state.borrow().view.connect_resize(move |_, _, _| {
-                let event = WindowEvent::Resize(inner_state.borrow().window.framebuffer_size());
-                servo.borrow_mut().handle_events(vec![event]);
+                servo.borrow_mut().handle_events(vec![WindowEvent::Resize]);
             });
         }
 
@@ -312,7 +308,7 @@ impl WebView {
             let servo = servo.clone();
             state.borrow().view.connect_scroll_event(move |_, event| {
                 let state = event.get_state();
-                if !state.contains(CONTROL_MASK) {
+                if !state.contains(ModifierType::CONTROL_MASK) {
                     let phase = match event.get_direction() {
                         ScrollDirection::Down => TouchEventType::Down,
                         ScrollDirection::Up => TouchEventType::Up,

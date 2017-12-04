@@ -2,7 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use gdk;
-use gdk::{Display, WindowExt};
+use gdk::{Display, Screen, WindowExt};
 use gtk::{GLAreaExt, WidgetExt};
 use servo::BrowserId;
 use servo::compositing::compositor_thread::EventLoopWaker;
@@ -244,5 +244,14 @@ impl WindowMethods for GtkWindow {
     }
 
     fn handle_key(&self, _id: Option<BrowserId>, _ch: Option<char>, _key: Key, _mods: KeyModifiers) {
+    }
+
+    fn screen_size(&self, _: BrowserId) -> Size2D<u32> {
+        Size2D::new(Screen::width() as u32, Screen::height() as u32)
+    }
+
+    fn screen_avail_size(&self, _: BrowserId) -> Size2D<u32> {
+        // FIXME: Glutin doesn't have API for available size. Fallback to screen size
+        Size2D::new(Screen::width() as u32, Screen::height() as u32)
     }
 }

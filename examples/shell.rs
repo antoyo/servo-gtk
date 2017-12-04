@@ -13,7 +13,7 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gdk::{ScrollDirection, CONTROL_MASK};
+use gdk::{ModifierType, ScrollDirection};
 use gdk::enums::key;
 use gtk::{
     Button,
@@ -22,6 +22,7 @@ use gtk::{
     ContainerExt,
     Entry,
     EntryExt,
+    GtkWindowExt,
     Image,
     Inhibit,
     Notebook,
@@ -36,7 +37,6 @@ use gtk::{
     ToolItemExt,
     WidgetExt,
     Window,
-    WindowExt,
     WindowType,
 };
 use gtk::Orientation::Vertical;
@@ -98,7 +98,7 @@ impl App {
         let webviews = self.webviews.clone();
         let widgets = self.widgets.clone();
         self.widgets.window.connect_key_press_event(move |_, event| {
-            if event.get_state().contains(CONTROL_MASK) {
+            if event.get_state().contains(ModifierType::CONTROL_MASK) {
                 match event.get_keyval() {
                     key::_0 => {
                         with_tab!(tabs, webviews, |webview| {
@@ -283,7 +283,7 @@ impl App {
         {
             let view = webview.clone();
             webview.view().connect_scroll_event(move |_, event| {
-                if event.get_state().contains(CONTROL_MASK) {
+                if event.get_state().contains(ModifierType::CONTROL_MASK) {
                     let step = match event.get_direction() {
                         ScrollDirection::Down => -0.1,
                         ScrollDirection::Up => 0.1,

@@ -1,12 +1,5 @@
-use gdk::{
-    ModifierType,
-    keyval_to_unicode,
-    CONTROL_MASK,
-    META_MASK,
-    SHIFT_MASK,
-    SUPER_MASK,
-};
-use servo::msg::constellation_msg::{ALT, CONTROL, SHIFT, SUPER};
+use gdk::keyval_to_unicode;
+use gdk::ModifierType;
 use gdk::enums::key as gdk_key;
 use gdk_sys::{GDK_BUTTON_MIDDLE, GDK_BUTTON_PRIMARY, GDK_BUTTON_SECONDARY};
 use servo::msg::constellation_msg::{Key, KeyModifiers};
@@ -14,17 +7,17 @@ use servo::script_traits::MouseButton;
 
 pub fn modifiers(modifiers: ModifierType) -> KeyModifiers {
     let mut result = KeyModifiers::empty();
-    if modifiers.contains(META_MASK) {
-        result.insert(ALT);
+    if modifiers.contains(ModifierType::META_MASK) {
+        result.insert(KeyModifiers::ALT);
     }
-    if modifiers.contains(SUPER_MASK) {
-        result.insert(SUPER);
+    if modifiers.contains(ModifierType::SUPER_MASK) {
+        result.insert(KeyModifiers::SUPER);
     }
-    if modifiers.contains(CONTROL_MASK) {
-        result.insert(CONTROL);
+    if modifiers.contains(ModifierType::CONTROL_MASK) {
+        result.insert(KeyModifiers::CONTROL);
     }
-    if modifiers.contains(SHIFT_MASK) {
-        result.insert(SHIFT);
+    if modifiers.contains(ModifierType::SHIFT_MASK) {
+        result.insert(KeyModifiers::SHIFT);
     }
     result
 }
