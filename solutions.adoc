@@ -8,4 +8,4 @@ thread 'main' panicked at 'Unable to initialize webrender!: MaxTextureSize', /ch
 
 === Solution
 
-Need to create Servo after the window is shown.
+Need to make the GL context current before Servo is initialized.
