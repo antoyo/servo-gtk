@@ -2,18 +2,20 @@
 authors = ["Antoni Boucher <antoni.boucher@adgear.com>"]
 name = "servo-gtk"
 version = "0.1.0"
+
 [dependencies]
 epoxy = "^0.0.3"
-gdk = "^0.7.0"
-gdk-sys = "^0.5.0"
-glib = "^0.4.0"
-glib-itc = "^0.3.0"
-gtk = "^0.3.0"
+gdk = "^0.9.0"
+gdk-sys = "^0.7.0"
+glib = "^0.6.0"
+glib-itc = "^0.5.0"
+gtk = "^0.5.0"
+keyboard-types = "^0.4.4"
 shared_library = "^0.1.5"
 
 [dependencies.libservo]
 git = "https://github.com/servo/servo"
-rev = "e4dba3abef2a4941c5a4d95d58ae0b864ad10961"
+rev = "a2937d948818665ecda16a06fe6c8fa751d265fd"
 
 [features]
 default = ["gtk/v3_16"]

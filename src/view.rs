@@ -1,5 +1,8 @@
 use std::cell::{Cell, RefCell};
 use std::env;
+use std::fs;
+use std::io;
+use std::path::PathBuf;
 use std::ptr;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex, Once, ONCE_INIT};
@@ -18,15 +21,16 @@ use gtk::{
     Inhibit,
     WidgetExt,
 };
+use keyboard_types::{Key, KeyboardEvent};
 use servo;
 use servo::BrowserId;
 use servo::compositing::windowing::{MouseWindowEvent, WindowEvent};
+use servo::embedder_traits::resources::{self, Resource};
 use servo::euclid::{TypedPoint2D, TypedVector2D};
 use servo::gl;
 use servo::ipc_channel::ipc;
-use servo::msg::constellation_msg::{KeyState, TraversalDirection};
+use servo::msg::constellation_msg::{TraversalDirection};
 use servo::script_traits::TouchEventType;
-use servo::servo_config::resource_files::set_resources_path;
 use servo::servo_url::ServoUrl;
 use shared_library::dynamic_library::DynamicLibrary;
 
@@ -52,6 +56,45 @@ macro_rules! with_servo {
 
 static EPOXY_INIT: Once = ONCE_INIT;
 
+struct ResourceReader;
+
+impl resources::ResourceReaderMethods for ResourceReader {
+    fn read(&self, file: Resource) -> Vec<u8> {
+        let file = filename(file);
+        let mut path = resources_dir_path().expect("Can't find resources directory");
+        path.push(file);
+        fs::read(path).expect("Can't read file")
+    }
+    fn sandbox_access_files_dirs(&self) -> Vec<PathBuf> {
+        vec![resources_dir_path().expect("Can't find resources directory")]
+    }
+    fn sandbox_access_files(&self) -> Vec<PathBuf> {
+        vec![]
+    }
+}
+
+fn filename(file: Resource) -> &'static str {
+    match file {
+        Resource::Preferences => "prefs.json",
+        Resource::BluetoothBlocklist => "gatt_blocklist.txt",
+        Resource::DomainList => "public_domains.txt",
+        Resource::HstsPreloadList => "hsts_preload.json",
+        Resource::SSLCertificates => "certs",
+        Resource::BadCertHTML => "badcert.html",
+        Resource::NetErrorHTML => "neterror.html",
+        Resource::UserAgentCSS => "user-agent.css",
+        Resource::ServoCSS => "servo.css",
+        Resource::PresentationalHintsCSS => "presentational-hints.css",
+        Resource::QuirksModeCSS => "quirks-mode.css",
+        Resource::RippyPNG => "rippy.png",
+    }
+}
+
+fn resources_dir_path() -> io::Result<PathBuf> {
+    let path = env::current_dir().unwrap().join("resources");
+    Ok(path)
+}
+
 pub type View = GLArea;
 
 struct Pos {
@@ -71,7 +114,7 @@ impl Pos {
 struct State {
     browser_id: Option<BrowserId>,
     pointer: Pos,
-    rx: Receiver,
+    rx: Receiver<()>,
     servo: Option<Rc<RefCell<servo::Servo<GtkWindow>>>>,
     view: View,
     window: Rc<GtkWindow>,
@@ -218,11 +261,13 @@ impl WebView {
     fn prepare(state: Rc<RefCell<State>>) {
         state.borrow().view.make_current();
 
+        resources::set(Box::new(ResourceReader));
+
         let servo = Rc::new(RefCell::new(servo::Servo::new(state.borrow().window.clone())));
 
         {
             let servo = servo.clone();
-            state.borrow_mut().rx.connect_recv(move || {
+            state.borrow_mut().rx.connect_recv(move |()| {
                 servo.borrow_mut().handle_events(vec![]);
                 Continue(true)
             });
@@ -234,14 +279,17 @@ impl WebView {
                 let (char, key) = convert::key(event.get_keyval());
                 if let Some(key) = key {
                     let modifiers = convert::modifiers(event.get_state());
-                    let event = WindowEvent::KeyEvent(char, key, KeyState::Pressed, modifiers);
+                    let mut event = KeyboardEvent::default();
+                    event.key = key;
+                    event.modifiers = modifiers;
+                    let event = WindowEvent::Keyboard(event);
                     servo.borrow_mut().handle_events(vec![event]);
                 }
                 Inhibit(false)
             });
         }
 
-        {
+        /*{
             let servo = servo.clone();
             state.borrow().view.connect_key_release_event(move |_, event| {
                 let (char, key) = convert::key(event.get_keyval());
@@ -252,7 +300,7 @@ impl WebView {
                 }
                 Inhibit(false)
             });
-        }
+        }*/
 
         {
             let servo = servo.clone();
@@ -336,14 +384,9 @@ impl WebView {
             });
         }
 
-        let path = env::current_dir().unwrap().join("resources");
-        let path = path.to_str().unwrap().to_string();
-        set_resources_path(Some(path));
-
         let url = ServoUrl::parse("https://servo.org").unwrap();
-        let (sender, receiver) = ipc::channel().unwrap();
-        servo.borrow_mut().handle_events(vec![WindowEvent::NewBrowser(url, sender)]);
-        let browser_id = receiver.recv().unwrap();
+        let browser_id = BrowserId::new();
+        servo.borrow_mut().handle_events(vec![WindowEvent::NewBrowser(url, browser_id)]);
         servo.borrow_mut().handle_events(vec![WindowEvent::SelectBrowser(browser_id)]);
         state.borrow_mut().browser_id = Some(browser_id);
         state.borrow_mut().servo = Some(servo);

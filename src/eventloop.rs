@@ -1,14 +1,14 @@
 use std::sync::{Arc, Mutex};
 
 use glib_itc::Sender;
-use servo::compositing::compositor_thread::EventLoopWaker;
+use servo::embedder_traits::EventLoopWaker;
 
 pub struct GtkEventLoopWaker {
-    tx: Arc<Mutex<Sender>>,
+    tx: Arc<Mutex<Sender<()>>>,
 }
 
 impl GtkEventLoopWaker {
-    pub fn new(tx: Arc<Mutex<Sender>>) -> Self {
+    pub fn new(tx: Arc<Mutex<Sender<()>>>) -> Self {
         GtkEventLoopWaker {
             tx,
         }
@@ -25,6 +25,6 @@ impl EventLoopWaker for GtkEventLoopWaker {
 
     // Called by servo when the main thread needs to wake up
     fn wake(&self) {
-        self.tx.lock().unwrap().send();
+        self.tx.lock().unwrap().send(());
     }
 }

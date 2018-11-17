@@ -8,6 +8,7 @@ extern crate gdk;
 extern crate gdk_sys;
 extern crate glib_itc;
 extern crate gtk;
+extern crate keyboard_types;
 extern crate servo;
 extern crate shared_library;
 
