@@ -22,8 +22,10 @@ fn main() {
     let vbox = gtk::Box::new(Vertical, 0);
     gtk_window.add(&vbox);
 
-    let webview = WebView::new();
-    let view = webview.view();
+    let area = gtk::GLArea::new();
+    let webview = WebView::new(area.clone());
+    //let view = webview.view();
+    let view = area;
     view.set_vexpand(true);
     vbox.add(&view);
 

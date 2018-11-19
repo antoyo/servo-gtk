@@ -2,3 +2,4 @@
 **/*.rs.bk
 _virtualenv
 resources
+ServoGtk.gir

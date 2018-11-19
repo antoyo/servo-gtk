@@ -15,10 +15,12 @@ use gdk::{
 use gdk::ModifierType;
 use glib_itc::{Receiver, channel};
 use gtk::{
+    Cast,
     Continue,
     GLArea,
     GLAreaExt,
     Inhibit,
+    IsA,
     WidgetExt,
 };
 use keyboard_types::{Key, KeyboardEvent};
@@ -127,8 +129,8 @@ pub struct WebView {
 }
 
 impl WebView {
-    pub fn new() -> Self {
-        let view = GLArea::new();
+    pub fn new<V: IsA<GLArea> + IsA<gtk::Object>>(view: V) -> Self {
+        let view: GLArea = view.upcast();
         view.set_auto_render(false);
         view.set_has_depth_buffer(true);
         view.add_events((EventMask::BUTTON_PRESS_MASK | EventMask::BUTTON_RELEASE_MASK | EventMask::POINTER_MOTION_MASK
