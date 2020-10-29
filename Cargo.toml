@@ -1,7 +1,13 @@
 [package]
-authors = ["Antoni Boucher <antoni.boucher@adgear.com>"]
 name = "servo-gtk"
 version = "0.1.0"
+edition = "2018"
+description = "Servo binding for gtk-rs"
+authors = ["Antoni Boucher <antoni.boucher@adgear.com>"]
+license = "MPL-2.0"
+repository = "https://github.com/antoyo/servo-gtk"
+readme = "README.md"
+keywords = ["gtk","bindings","webengine","servo","web",]
 
 [dependencies]
 epoxy = "^0.0.3"
